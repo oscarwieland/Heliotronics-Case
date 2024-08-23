@@ -1,0 +1,308 @@
+---
+title: "Case study 1:The Heliotronics Case "
+author: "Oscar Wieland, Pablo Huber"
+date: "2024-03-07"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    toc: yes
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+#### Preparation 
+
+```{r}
+rm(list = ls()) #Clean the entire environment
+cat("\014") # clean console
+setwd("~/Desktop/Master-Business analytics/Spring semester/Advanced Data Driven/Case study/Case study 1")
+```
+
+##### Install required packages
+```{r}
+# install.packages('dplyr')
+# install.packages('lm.beta')
+```
+
+#### Import required packages
+```{r echo=TRUE, message=FALSE}
+## set library
+library(prettydoc) # for the theme
+library(dplyr) 
+library(ggplot2)
+library(lm.beta)
+library(data.table)
+```
+
+
+## Context 
+A widely known notion in our society is that through repetition of a task, one should experience increased productivity and enhancement for subsequent executions of the same task. This concept can be expressed mathematically using the formula: $Y = AX^b$, where in our case:  
+Y = the average manufacturing cost of the last batch of 100 solar panels in $  
+A = the price of the first unit.  
+X =  the total number of solar panels produced  
+b = the experience parameter  
+
+In the industry context, this means that the cost of manufacturing or installing a unit should decrease as the total number of units manufactured increases.
+
+This can be modeled with the experience curve as it describes the decreasing cost associated with increased experience, quantified by the accumulated output achieved.
+
+
+## Our goal
+We have been contacted by Mr Clayton Handleman, the CEO of Heliotronics, a solar panels company. He desires to participate in a project initiated by the Canton of Tessin, which aims to install 400 solar panels by June 2022. To do so, he contacted us to find a competitive price that would allow him to do better than his competitors.
+Knowing about the experience curve and by being aware that by the time Heliotronics begins production of the 400 solar panels, an additional 2400 solar panels will have already been produced, we can anticipate a decrease in the production cost per unit. Thus, we should provide Mr Handleman an estimate about the average manufacturing cost for the last 400 panels. 
+
+
+
+We received data of the evolution of the average manufacturing cost per batch of solar panel since heliotronics started production a few years ago. 
+```{r}
+Hdata = read.csv("Case_Stud_ I.csv")
+Hdata
+```
+
+```{r}
+summary(Hdata)
+```
+## Question 1
+Let's make a scatter plot:
+```{r}
+ggplot(Hdata, aes(number_of_solar_panels, manufacturing_cost) ) +
+  ggtitle("Impact of Total nb of solar panels on Average manufacturing costs") +
+  xlab("Total number of solar panels produced") +
+  ylab("Average manufacturing costs of the last batch") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_point() +
+  geom_smooth()
+```
+
+
+As we can see, a linear trend is not apparent. Instead, the data follow the multiplicative learning model $Y=AX^b$.This experience curve illustrates a decrease in the manufacturing cost per batch as the total quantity manufactured increase. Unfortunately, this is not a linear relationship that a regression analysis can model. 
+
+
+Thus, we will transform the data in order to have a linear relationship. To do so, we  make a logarithmic transformation:
+$$
+Y=AX^b \implies log(Y)=log(A)+b*log(X) 
+$$
+We will transform the variables and add them to our table:
+```{r}
+Hdata = Hdata %>% 
+  mutate(Log_number_of_solar_panels= log(number_of_solar_panels))
+Hdata = Hdata %>% 
+  mutate(Log_manufacturing_cost= log(manufacturing_cost))
+```
+
+We can remake the scatterplot: 
+```{r}
+ggplot(Hdata, aes(Log_number_of_solar_panels, Log_manufacturing_cost)) +
+  ggtitle("Impact of Number of Solar Panels on Manufacturing Costs (Log Scale)") +
+  xlab("Total number of solar panels (Log Scale)") +
+  ylab("Manufacturing costs per batch (Log Scale)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_point()+
+    geom_smooth(method="lm")
+```
+
+Now we have a linear relationship which is represented by a straight line.  
+
+## Question 2
+It's interesting to conduct a linear regression with the transformed data. Here is the estimated regression model: 
+```{r}
+Model=with(Hdata,lm(Log_manufacturing_cost~Log_number_of_solar_panels))
+
+summary(lm.beta(Model))
+```
+The F-statistic is large and it's p-value is small which means the model is (overall) statistically significant.
+
+there is a high multiple R-squared and a high Adjusted R-squared. It means that a large proportion (94.77%) of the variability in the dependent variable is explained by the independent variable in the regression model. It suggests that the model fits the data well and that the independent variable is a good predictor of the dependent variable.
+
+The variable "Log_number_of_solar_panels" and the intercept have a very small p-value which means that both coefficients are significantly different from zero. It allows us to infer that if the variable change it leads to a corresponding change in the outcome. 
+In this case, log(A) is 7.850325 and b is -0.154991. But how can we interpret these coefficients ? Be careful, we are dealing with a logarithmic transformation so we cannot rely on a one-for-one relationship (When X increase by 1, Y increase also by 1) as the logarithmic transformation alters the relationship. We are dealing with a log-log model. Thus, when the number of solar panels increase by 1%, the manufacturing costs decrease by 0.154991%.
+
+We can write the regression as: 
+$$
+log(Y)=7.850325 - 0.154991*log(X) 
+$$
+
+
+It is also interesting to know the learning rate. It can be defined as:   
+1 - Progress ratio, where the progress ratio = $\frac{Y_{2x}}{Y_{x}}$ 
+
+Let's develop the components of the progress ratio: 
+First we have to find $Y_{2x}$ 
+$$
+Log(Y_{2x}) = Log(A) + b*Log(2X) \\
+\implies Log(Y_{2x}) - b*Log(2X) = Log(A) \implies Log(Y_{2x}) - Log((2X)^b) = Log(A) \\
+\implies  Log(\frac{Y_{2x}}{(2X)^{b}}) = Log(A)\implies \frac{Y_{2x}}{(2X)^{b}}= A \\
+ \implies Y_{2x}=A2^bX^b
+$$
+
+We have also to find $Y_{x}$. It is the same procedure as before: 
+$$
+Log(Y_{x}) = Log(A) + b*Log(X) \\
+\implies Log(Y_{x}) - b*Log(X) = Log(A)\\
+\implies Log(Y_{x}) - Log(X^b) = Log(A)  \\
+\implies  Log(\frac{Y_{x}}{X^{b}}) = Log(A) \implies \frac{Y_{x}}{X^{b}}= A \\
+\implies Y_{x}=AX^b
+$$
+
+
+Thus, the progress ratio: 
+$$
+\frac{Y_{2x}}{Y_{x}} = \frac{A*(2X)^{b}}{A*X^{b}} = 2^{b}
+$$
+Finally, the learning rate is:
+Learning rate = 1 - Process ratio = $1 - 2^{b}$
+```{r}
+Learning_rate = 1 - 2^(-0.154991)
+Learning_rate
+```
+The learning rate is 10.1862%.
+
+
+## Question 3
+Now that we have estimated the experience curve using the regression model, we can determine the expected average manufacturing cost per solar panel for the last 400 solar panels. It's important to note that an additional 2400 solar panels will be produced meanwhile. Consequently, the total production volume will reach 4600 units by the time the new 400 solar panels are added. The new 400 solar panels will thus be numbered as follows: 4700, 4800, 4900, and 5000.
+
+As our estimates have been created with a log-log model. It should be interesting to go back to the model in order to have real value and be able to interpret the average manufacturing costs.
+
+
+$$
+log(Y) = log(A) + b*log(X)  \\
+\implies e^{log(Y)}=e^{(log(A)+b \cdot log(X))}  \\
+\implies e^{log(Y)}=e^{log(A)}*e^{b \cdot log(X)} \\
+\implies Y= Ae^{b \cdot log(X)} \\
+\implies Y=AX^b
+$$
+
+
+
+
+
+
+```{r}
+A = exp(7.850325)
+b = - 0.154991
+print(paste("A =", A))
+print(paste("b = ", b))
+```
+
+So we have:
+$$
+Y = 2566.568*X^{-0.154991}
+$$
+```{r}
+Hdata2 = Hdata[,1:2]
+```
+
+
+We created a for-loop that complete the table using the formula $Y = 2566.568*X^{-0.154991}$: 
+```{r}
+library(data.table)
+for (i in seq(2300, 5000, 100)){
+  new_row = data.frame(number_of_solar_panels=i, manufacturing_cost=A*i^{b})
+  Hdata2 = rbind(Hdata2, new_row)
+}
+```
+
+This is the resulting table with all the manufacturing costs for the solar panels made after 2200: 
+```{r}
+Hdata2
+```
+
+Here is the plot the predicted average manufacturing costs: 
+```{r}
+ggplot(Hdata2, aes(number_of_solar_panels, manufacturing_cost) ) +
+  ggtitle("Impact of Total Nb of Solar Panels on Average manufacturing Costs") +
+  xlab("Total number of solar panels") +
+  ylab("Average manufacturing costs") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_point() +
+  geom_smooth()
+```
+
+Finally, to have an idea of the expected average manufacturing cost per solar panel for the 400 solar panels that would be produced we took the mean of the manufacturing costs for the last 400 panels:
+```{r}
+production = Hdata2[47:50,]
+production
+mean_avg_c = mean(production$manufacturing_cost)
+mean_avg_c
+```
+ The Average cost of the last 400 panels is: 688.837366146509
+
+## Question 4
+
+Finally, we can calculate a 95% confidence interval for the average manufacturing cost per solar panel for the panels produced for Tessin by using the lower and upper bounds of the confidence interval estimate for the experience parameter.
+```{r}
+CI=confint(Model)
+CI
+```
+
+To do so, we created a for-loop that generates the lower and upper bounds of the confidence interval for each manufacturing cost ranging from 4700 to 5000 solar panels.
+```{r}
+t_alpha = qnorm(0.975)
+library(data.table)
+
+
+CI95 <- data.table(
+    Mean = numeric(0), 
+    Lower_bound = numeric(0), 
+    Upper_bound = numeric(0)
+)
+
+for (i in seq(47, 50, 1)){
+  new_row = data.frame(
+    Mean=Hdata2[i,"manufacturing_cost"], 
+    Lower_bound=exp(CI[1,1])*(Hdata2[i,"number_of_solar_panels"]^CI[2,1]),
+    Upper_bound=exp(CI[1,2])*(Hdata2[i,"number_of_solar_panels"]^CI[2,2])
+  )
+  CI95 = rbind(CI95, new_row)
+}
+```
+
+
+```{r}
+CI95
+```
+
+```{r}
+Hdata2 = as.data.table(Hdata2)
+Hdata2[, row_num := .I]
+CI95[, row_num := 47:50]
+
+merged = merge(Hdata2, CI95,by="row_num", all.x=TRUE)
+
+
+ggplot(merged, aes(number_of_solar_panels, manufacturing_cost) ) +
+  ggtitle("Impact of Total Nb of Solar Panels on Average manufacturing Costs + CI") +
+  xlab("Total number of solar panels") +
+  ylab("Average manufacturing costs") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_point() +
+  geom_ribbon(aes(ymin = Lower_bound, ymax = Upper_bound), alpha = 0.3, fill = "blue") +
+  geom_smooth()
+
+```
+
+
+
+Then we took the mean of the lower bound and upper: 
+```{r}
+LowerB = mean(CI95$Lower_bound)
+UpperB = mean(CI95$Upper_bound)
+```
+The lower bound is:  534.334635196834  
+The upper bound is:  888.021205058857
+
+## Conclusion
+
+Helitronics should take into account this experience curve and propose a price around 688. If they think the price is too high and take the bet that their average manufacturing cost will be closer, they can set a price between 688 and the lower bond.
+If they think the  other competitors will set a price much higher, they can also propose a price between 688 and the upper bond to maximize profit.
+
+
+
+
+
+
